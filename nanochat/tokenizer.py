@@ -9,7 +9,6 @@ Two implementations are available:
 import os
 import copy
 from functools import lru_cache
-from collections import deque
 
 SPECIAL_TOKENS = [
     # every document begins with the Beginning of Sequence (BOS) token that delimits documents
@@ -227,16 +226,15 @@ class RustBPETokenizer:
             ids = self.enc.encode_ordinary(text)
             ids = deque(ids)
             if prepend is not None:
-                ids.appendleft(prepend_id) # TODO: slightly inefficient here? :( hmm
+                ids = [prepend_id, *ids]
             if append is not None:
                 ids.append(append_id)
             ids = list(ids)
         elif isinstance(text, list):
             ids = self.enc.encode_ordinary_batch(text, num_threads=num_threads)
-            ids = [deque(row) for row in ids]
             if prepend is not None:
                 for ids_row in ids:
-                    ids_row.appendleft(prepend_id) # TODO: same
+                    ids_row = [prepend_id, *ids_row]
             if append is not None:
                 for ids_row in ids:
                     ids_row.append(append_id)

@@ -215,34 +215,28 @@ class RustBPETokenizer:
         return self.bos_token_id
 
     def encode(self, text, prepend=None, append=None, num_threads=8):
-        # text can be either a string or a list of strings
-
-        if prepend is not None:
-            prepend_id = prepend if isinstance(prepend, int) else self.encode_special(prepend)
-        if append is not None:
-            append_id = append if isinstance(append, int) else self.encode_special(append)
+        pre_id = None if prepend is None else (prepend if isinstance(prepend, int) else self.encode_special(prepend))
+        post_id = None if append  is None else (append  if isinstance(append,  int) else self.encode_special(append))
+        threads = num_threads or os.cpu_count() or 8
 
         if isinstance(text, str):
             ids = self.enc.encode_ordinary(text)
-            ids = deque(ids)
-            if prepend is not None:
-                ids = [prepend_id, *ids]
-            if append is not None:
-                ids.append(append_id)
-            ids = list(ids)
-        elif isinstance(text, list):
-            ids = self.enc.encode_ordinary_batch(text, num_threads=num_threads)
-            if prepend is not None:
-                for ids_row in ids:
-                    ids_row = [prepend_id, *ids_row]
-            if append is not None:
-                for ids_row in ids:
-                    ids_row.append(append_id)
-            ids = [list(row) for row in ids]
-        else:
-            raise ValueError(f"Invalid input type: {type(text)}")
+            if pre_id is not None: ids = [pre_id] + ids
+            if post_id is not None: ids = ids + [post_id]
+            return ids
 
-        return ids
+        if isinstance(text, list):
+            rows = self.enc.encode_ordinary_batch(text, num_threads=threads)
+            if pre_id is None and post_id is None:
+                # Already Python lists; return as-is (no extra copies)
+                return rows
+            pre = [] if pre_id is None else [pre_id]
+            post = [] if post_id is None else [post_id]
+            # One allocation per row
+            return [pre + row + post for row in rows]
+        
+        raise ValueError(f"Invalid input type: {type(text)}")
+
 
     def __call__(self, *args, **kwargs):
         return self.encode(*args, **kwargs)
